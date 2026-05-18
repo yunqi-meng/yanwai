@@ -1,0 +1,4 @@
+SET PASSWORD FOR 'root'@'localhost' = 'lyp1234zhen';
+FLUSH PRIVILEGES;
+CREATE DATABASE IF NOT EXISTS yanwai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE yanwai;

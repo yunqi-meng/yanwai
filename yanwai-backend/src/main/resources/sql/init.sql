@@ -18,14 +18,19 @@ CREATE TABLE user (
     late_night_count INT DEFAULT 0 COMMENT '深夜分析次数',
     workplace_count INT DEFAULT 0 COMMENT '职场类分析次数',
     romance_count INT DEFAULT 0 COMMENT '情感类分析次数',
-    login_days INT DEFAULT 0 COMMENT '连续登录天数',
-    legend_count INT DEFAULT 0 COMMENT '传说卡牌拥有数量',
-    last_login_date DATE DEFAULT NULL COMMENT '上次登录日期',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
+    member_expire_time DATETIME DEFAULT NULL COMMENT '会员过期时间',
+    last_ad_watch_date DATE DEFAULT NULL COMMENT '上次观看广告日期',
+    email VARCHAR(100) DEFAULT NULL COMMENT '邮箱',
+    password VARCHAR(100) DEFAULT NULL COMMENT '密码',
+    login_days INT DEFAULT 0 COMMENT '连续登录天数',
+    legend_count INT DEFAULT 0 COMMENT '传说卡牌拥有数量',
+    last_login_date DATE DEFAULT NULL COMMENT '上次登录日期',
     INDEX idx_openid (openid),
-    INDEX idx_member_level (member_level)
+    INDEX idx_member_level (member_level),
+    UNIQUE KEY uk_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 分析记录表

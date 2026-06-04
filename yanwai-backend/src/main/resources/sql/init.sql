@@ -30,7 +30,7 @@ CREATE TABLE user (
     last_login_date DATE DEFAULT NULL COMMENT '上次登录日期',
     PRIMARY KEY (id),
     UNIQUE KEY openid (openid),
-    UNIQUE KEY uk_email (email),
+    UNIQUE KEY email (email),
     KEY idx_openid (openid),
     KEY idx_member_level (member_level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
@@ -38,7 +38,7 @@ CREATE TABLE user (
 -- 分析记录表
 DROP TABLE IF EXISTS analysis_record;
 CREATE TABLE analysis_record (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     original_text TEXT NOT NULL COMMENT '原始对话',
     analysis_result JSON COMMENT '完整AI返回JSON',
@@ -49,15 +49,16 @@ CREATE TABLE analysis_record (
     original_image LONGTEXT COMMENT '原始图片base64',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
-    INDEX idx_user_id (user_id),
-    INDEX idx_created_at (created_at)
+    PRIMARY KEY (id),
+    KEY idx_user_id (user_id),
+    KEY idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分析记录表';
 
 -- 成就定义表
 DROP TABLE IF EXISTS achievement_def;
 CREATE TABLE achievement_def (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-    code VARCHAR(50) NOT NULL UNIQUE COMMENT '唯一标识',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    code VARCHAR(50) NOT NULL COMMENT '唯一标识',
     name VARCHAR(100) NOT NULL COMMENT '成就名称',
     description VARCHAR(255) DEFAULT NULL COMMENT '成就描述',
     condition_field VARCHAR(50) NOT NULL COMMENT '统计字段',
@@ -68,25 +69,28 @@ CREATE TABLE achievement_def (
     icon VARCHAR(100) DEFAULT NULL COMMENT '图标',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
-    INDEX idx_code (code)
+    PRIMARY KEY (id),
+    UNIQUE KEY code (code),
+    KEY idx_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成就定义表';
 
 -- 用户成就表
 DROP TABLE IF EXISTS user_achievement;
 CREATE TABLE user_achievement (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     achievement_id BIGINT NOT NULL COMMENT '成就ID',
     unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '解锁时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
+    PRIMARY KEY (id),
     UNIQUE KEY uk_user_achievement (user_id, achievement_id),
-    INDEX idx_user_id (user_id)
+    KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户成就表';
 
 -- 人格卡牌定义表
 DROP TABLE IF EXISTS personality_card_def;
 CREATE TABLE personality_card_def (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     name VARCHAR(50) NOT NULL COMMENT '卡牌名称',
     rarity TINYINT NOT NULL COMMENT '稀有度: 1普通 2稀有 3史诗 4传说',
     emoji VARCHAR(10) DEFAULT NULL COMMENT '代表emoji',
@@ -95,13 +99,14 @@ CREATE TABLE personality_card_def (
     trait VARCHAR(255) DEFAULT NULL COMMENT '特质描述',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
-    INDEX idx_rarity (rarity)
+    PRIMARY KEY (id),
+    KEY idx_rarity (rarity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='人格卡牌定义表';
 
 -- 用户卡牌表
 DROP TABLE IF EXISTS user_card;
 CREATE TABLE user_card (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     card_id BIGINT NOT NULL COMMENT '卡牌ID',
     quantity INT DEFAULT 0 COMMENT '拥有数量',
@@ -109,8 +114,9 @@ CREATE TABLE user_card (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '首次获得时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
+    PRIMARY KEY (id),
     UNIQUE KEY uk_user_card (user_id, card_id),
-    INDEX idx_user_id (user_id)
+    KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户卡牌表';
 
 -- 初始化成就数据

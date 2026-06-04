@@ -11,6 +11,5 @@ public class UserCardDTO {
     private String emoji;
     private String description;
     private Integer quantity;
-    private Integer fragmentCount;
     private Boolean isNew;
 }

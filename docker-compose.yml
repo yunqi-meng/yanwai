@@ -1,11 +1,12 @@
 version: '3.8'
 
 services:
+  # ── MySQL 数据库 ──
   mysql:
     image: mysql:8.0
     container_name: yanwai-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: yanwai
     ports:
       - "3306:3306"
@@ -13,7 +14,15 @@ services:
       - mysql_data:/var/lib/mysql
       - ./yanwai-backend/src/main/resources/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - yanwai-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── SpringBoot 后端 ──
   backend:
     build:
       context: .
@@ -22,14 +31,22 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/yanwai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=root
-      - YANWAI_AI_API_KEY=${AI_API_KEY}
-      - YANWAI_AI_BASE_URL=${AI_BASE_URL:-https://api.deepseek.com}
+      - DB_URL=jdbc:mysql://mysql:3306/yanwai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+      - YANWAI_AI_API_KEY=${YANWAI_AI_API_KEY}
+      - YANWAI_AI_BASE_URL=${YANWAI_AI_BASE_URL:-https://api.deepseek.com}
+      - YANWAI_AI_VISION_API_KEY=${YANWAI_AI_VISION_API_KEY}
+      - YANWAI_AI_VISION_BASE_URL=${YANWAI_AI_VISION_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      - YANWAI_AI_VISION_MODEL=${YANWAI_AI_VISION_MODEL:-doubao-seed-1-6-vision-250815}
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+    networks:
+      - yanwai-net
+    restart: unless-stopped
 
+  # ── Web App 前端 ──
   frontend:
     build:
       context: .
@@ -39,6 +56,27 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    networks:
+      - yanwai-net
+    restart: unless-stopped
+
+  # ── 管理后台 ──
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: yanwai-admin
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - yanwai-net
+    restart: unless-stopped
 
 volumes:
   mysql_data:
+
+networks:
+  yanwai-net:
+    driver: bridge

@@ -5,26 +5,22 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("user_card_fragment")
-public class UserCardFragment {
+@TableName("system_config")
+public class SystemConfig {
     @TableId(type = IdType.AUTO)
     private Long id;
     
-    @TableField("user_id")
-    private Long userId;
+    @TableField("config_key")
+    private String configKey;
     
-    @TableField("card_id")
-    private Long cardId;
+    @TableField("config_value")
+    private String configValue;
     
-    @TableField("fragment_count")
-    private Integer fragmentCount;
+    private String description;
     
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
-    
-    @TableLogic
-    private Integer deleted;
 }

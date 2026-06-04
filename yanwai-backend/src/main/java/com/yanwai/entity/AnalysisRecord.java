@@ -28,6 +28,9 @@ public class AnalysisRecord {
     
     private String advice;
     
+    @TableField("original_image")
+    private String originalImage;
+    
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     

@@ -1,12 +1,24 @@
 <template>
   <div class="result-view page-container" ref="resultContainer">
     <div class="header">
+      <button class="back-btn" @click="goHome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
+          <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <div class="header-decoration">
         <div class="decoration-dot"></div>
         <div class="decoration-dot"></div>
         <div class="decoration-dot"></div>
       </div>
       <h1 class="title gold-gradient">解码结果</h1>
+    </div>
+
+    <div v-if="originalImage" class="image-section card">
+      <button class="view-image-btn" @click="openImageModal">
+        <span class="btn-icon">🖼️</span>
+        <span>查看原图</span>
+      </button>
     </div>
 
     <div class="relationship-section card">
@@ -59,6 +71,49 @@
       </ul>
     </div>
 
+    <div class="reply-section card">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="title-icon">💬</span>
+          回复模板
+        </div>
+        <div class="section-subtitle">点击即可复制</div>
+      </div>
+      <div class="reply-tabs">
+        <div
+          v-for="tab in replyTabs"
+          :key="tab.id"
+          class="reply-tab"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
+        >
+          <span class="tab-icon">{{ tab.icon }}</span>
+          <span class="tab-name">{{ tab.name }}</span>
+        </div>
+      </div>
+      <div class="reply-list">
+        <div
+          v-for="(reply, index) in currentReplies"
+          :key="index"
+          class="reply-item"
+          @click="copyReply(reply)"
+        >
+          <div class="reply-content">
+            <div class="reply-header">
+              <span class="reply-label">{{ reply.label }}</span>
+              <span class="reply-emotion" :class="reply.emotionClass">
+                {{ reply.emotion }}
+              </span>
+            </div>
+            <div class="reply-text">{{ reply.text }}</div>
+          </div>
+          <div class="copy-btn">
+            <span class="copy-icon">{{ copiedIndex === index ? '✓' : '📋' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <button class="btn-gold share-btn" @click="generateShareImage">
       生成分享图
     </button>
@@ -91,28 +146,59 @@
       </div>
     </div>
 
+    <div class="modal-overlay" v-if="showImageModal" @click.self="closeImageModal">
+      <div class="image-modal">
+        <div class="modal-header">
+          <span class="modal-title">原图预览</span>
+          <button class="close-icon" @click="closeImageModal">✕</button>
+        </div>
+        <div class="image-container">
+          <img :src="originalImage" alt="解码原图" class="preview-image" />
+        </div>
+        <button class="btn-gold download-btn" @click="downloadImage">
+          <span>📥</span>
+          <span>下载图片</span>
+        </button>
+      </div>
+    </div>
+
     <canvas ref="confettiCanvas" class="confetti-canvas"></canvas>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
 import confetti from 'canvas-confetti'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { analysisApi } from '../api'
+import { useAnalysisStore } from '../stores/analysis'
 
 const router = useRouter()
+const analysisStore = useAnalysisStore()
 const resultContainer = ref(null)
 const chartRef = ref(null)
 const confettiCanvas = ref(null)
+const copiedIndex = ref(-1)
+const activeTab = ref('gentle')
 
 const analysis = ref(null)
 const newCard = ref(null)
 const newAchievements = ref([])
 const showCardModal = ref(false)
 const showAchievementModal = ref(false)
+const showImageModal = ref(false)
+const originalImage = ref(null)
+
+const replyTabs = [
+  { id: 'gentle', icon: '🌸', name: '温柔版' },
+  { id: 'humor', icon: '😄', name: '幽默版' },
+  { id: 'direct', icon: '💪', name: '直接版' },
+  { id: 'smart', icon: '🧠', name: '高情商' },
+  { id: 'flirty', icon: '😏', name: '撩人版' }
+]
 
 function getEmotionClass(score) {
   if (score >= 0.7) return 'positive'
@@ -139,6 +225,167 @@ function closeCardModal() {
 
 function closeAchievementModal() {
   showAchievementModal.value = false
+}
+
+function openImageModal() {
+  showImageModal.value = true
+}
+
+function closeImageModal() {
+  showImageModal.value = false
+}
+
+function downloadImage() {
+  if (!originalImage.value) return
+  
+  const link = document.createElement('a')
+  link.download = 'decoded-image.jpg'
+  link.href = originalImage.value
+  link.click()
+  ElMessage.success('图片已下载')
+}
+
+function generateReplies() {
+  if (!analysis.value?.translations?.length) return []
+
+  const translations = analysis.value.translations
+  const relationship = analysis.value.relationship || '朋友'
+  const mainSubtext = translations[0]?.subtext || ''
+  const mainLiteral = translations[0]?.literal || ''
+  const lastSubtext = translations[translations.length - 1]?.subtext || ''
+
+  return {
+    gentle: [
+      {
+        label: '体贴问候',
+        emotion: '😊 温和',
+        emotionClass: 'emotion-positive',
+        text: `嗯嗯，我懂的~ ${mainSubtext.replace(/[？?。.!！]/g, '')}，放心吧，我心里有数的 😊`
+      },
+      {
+        label: '认真回应',
+        emotion: '🤗 暖心',
+        emotionClass: 'emotion-positive',
+        text: `谢谢你的关心呀 💕 ${lastSubtext}，有你在真好~`
+      },
+      {
+        label: '轻松闲聊',
+        emotion: '😌 放松',
+        emotionClass: 'emotion-neutral',
+        text: `哈哈，你说得对！${mainSubtext.replace(/[？?。.!！]/g, '')}，改天有空聊~`
+      }
+    ],
+    humor: [
+      {
+        label: '搞笑回复',
+        emotion: '😂 搞笑',
+        emotionClass: 'emotion-positive',
+        text: `哈哈哈哈哈！${mainLiteral.replace(/[？?。.!！]/g, '')}，你是在逗我吗笑死我了🤣`
+      },
+      {
+        label: '自嘲风格',
+        emotion: '😆 调皮',
+        emotionClass: 'emotion-positive',
+        text: `${mainSubtext.replace(/[？?。.!！]/g, '')}？好好好，你说的都对，我就是那个大冤种~😅`
+      },
+      {
+        label: '网络梗',
+        emotion: '🤣 幽默',
+        emotionClass: 'emotion-positive',
+        text: `啊这... ${mainSubtext.replace(/[？?。.!！]/g, '')}，属实是没想到啊😂`
+      }
+    ],
+    direct: [
+      {
+        label: '直截了当',
+        emotion: '💼 干脆',
+        emotionClass: 'emotion-neutral',
+        text: `${mainSubtext.replace(/[？?。.!！]/g, '')}，说白了就是${lastSubtext}，我明白了。`
+      },
+      {
+        label: '开门见山',
+        emotion: '🎯 明确',
+        emotionClass: 'emotion-neutral',
+        text: `行，我知道了。${mainSubtext.replace(/[？?。.!！]/g, '')}，直接说重点吧~`
+      },
+      {
+        label: '务实回复',
+        emotion: '📋 实际',
+        emotionClass: 'emotion-neutral',
+        text: `${mainLiteral}，所以你的意思是${lastSubtext}，对吗？`
+      }
+    ],
+    smart: [
+      {
+        label: '高情商回复',
+        emotion: '✨ 情商高',
+        emotionClass: 'emotion-positive',
+        text: `哎呀，你这一说我才反应过来~ ${mainSubtext.replace(/[？?。.!！]/g, '')}，果然还是你懂我 💫`
+      },
+      {
+        label: '聪明圆滑',
+        emotion: '🧩 机智',
+        emotionClass: 'emotion-positive',
+        text: `${lastSubtext}是吧？被你戳中了哈哈，不过我觉得吧... ${mainSubtext.replace(/[？?。.!！]/g, '')}~`
+      },
+      {
+        label: '化解尴尬',
+        emotion: '😎 从容',
+        emotionClass: 'emotion-positive',
+        text: `哈，我懂你意思了！${mainSubtext.replace(/[？?。.!！]/g, '')}，不愧是咱俩，心有灵犀~`
+      }
+    ],
+    flirty: [
+      {
+        label: '暧昧试探',
+        emotion: '😏 暧昧',
+        emotionClass: 'emotion-positive',
+        text: `${mainSubtext.replace(/[？?。.!！]/g, '')}~你是不是在暗示我什么呀？😏`
+      },
+      {
+        label: '撩人回复',
+        emotion: '💫 撩人',
+        emotionClass: 'emotion-positive',
+        text: `被你发现了~ ${lastSubtext}，你是不是一直在关注我呀？😊`
+      },
+      {
+        label: '调情风格',
+        emotion: '🥰 甜蜜',
+        emotionClass: 'emotion-positive',
+        text: `哎呀~ ${mainSubtext.replace(/[？?。.!！]/g, '')}，就你会说话，说得我都不好意思了~ 💕`
+      }
+    ]
+  }
+}
+
+const currentReplies = computed(() => {
+  const replies = generateReplies()
+  return replies[activeTab.value] || []
+})
+
+async function copyReply(reply) {
+  try {
+    await navigator.clipboard.writeText(reply.text)
+    const index = currentReplies.value.indexOf(reply)
+    copiedIndex.value = index
+    ElMessage.success('已复制到剪贴板')
+    setTimeout(() => {
+      copiedIndex.value = -1
+    }, 2000)
+  } catch (e) {
+    const textarea = document.createElement('textarea')
+    textarea.value = reply.text
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    const index = currentReplies.value.indexOf(reply)
+    copiedIndex.value = index
+    ElMessage.success('已复制到剪贴板')
+    setTimeout(() => {
+      copiedIndex.value = -1
+    }, 2000)
+  }
 }
 
 function initChart() {
@@ -232,13 +479,18 @@ function fireConfetti() {
   })
 }
 
+function goHome() {
+  router.replace('/')
+}
+
 onMounted(() => {
-  const stored = sessionStorage.getItem('decodeResult')
-  if (stored) {
-    const result = JSON.parse(stored)
-    analysis.value = result.analysis
-    newCard.value = result.newCard
-    newAchievements.value = result.newAchievements || []
+  if (analysisStore.result) {
+    const data = analysisStore.consumeResult()
+    analysis.value = data.result
+    newCard.value = data.newCard
+    newAchievements.value = data.newAchievements || []
+    const img = data.originalImage
+    originalImage.value = img && !img.startsWith('data:') ? 'data:image/jpeg;base64,' + img : img
 
     nextTick(() => {
       initChart()
@@ -263,7 +515,7 @@ onMounted(() => {
 
 <style scoped>
 .result-view {
-  padding: 16px 16px 90px;
+  padding: 16px 16px 100px;
   position: relative;
 }
 
@@ -271,6 +523,29 @@ onMounted(() => {
   text-align: center;
   padding: 24px 0 28px;
   position: relative;
+}
+
+.back-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  border-radius: 12px;
+  z-index: 2;
+}
+
+.back-btn:hover {
+  background: rgba(30, 41, 59, 0.8);
+  color: #D4AF37;
 }
 
 .header-decoration {
@@ -309,7 +584,7 @@ onMounted(() => {
 }
 
 .card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(18, 24, 38, 0.95));
+  background: var(--bg-card);
   border-radius: 20px;
   border: 1px solid rgba(212, 175, 55, 0.15);
   padding: 20px;
@@ -332,11 +607,47 @@ onMounted(() => {
 }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #D4AF37;
   font-size: 16px;
   font-weight: 700;
   margin-bottom: 16px;
   letter-spacing: 0.5px;
+}
+
+.title-icon {
+  font-size: 18px;
+}
+
+.image-section {
+  text-align: center;
+  padding: 16px;
+}
+
+.view-image-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 12px;
+  color: #D4AF37;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.view-image-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: #D4AF37;
+  transform: scale(1.02);
+}
+
+.btn-icon {
+  font-size: 16px;
 }
 
 .relationship-section {
@@ -470,6 +781,161 @@ onMounted(() => {
 
 .advice-list li:last-child {
   border-bottom: none;
+}
+
+.reply-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 20px 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-subtitle {
+  font-size: 12px;
+  color: #64748B;
+}
+
+.reply-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reply-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.reply-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.reply-tab:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.reply-tab.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1));
+  border-color: #D4AF37;
+}
+
+.tab-icon {
+  font-size: 14px;
+}
+
+.tab-name {
+  color: #F1F5F9;
+  font-weight: 500;
+}
+
+.reply-list {
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reply-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reply-item:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(212, 175, 55, 0.3);
+  transform: translateX(4px);
+}
+
+.reply-item:active {
+  transform: scale(0.98);
+}
+
+.reply-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.reply-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.reply-label {
+  font-size: 12px;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.reply-emotion {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.emotion-positive {
+  color: #67c23a;
+}
+
+.emotion-neutral {
+  color: #eab308;
+}
+
+.emotion-negative {
+  color: #ef4444;
+}
+
+.reply-text {
+  font-size: 14px;
+  color: #F8FAFC;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.1);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.reply-item:hover .copy-btn {
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.copy-icon {
+  font-size: 16px;
 }
 
 .share-btn {
@@ -670,4 +1136,78 @@ onMounted(() => {
   pointer-events: none;
   z-index: 9998;
 }
-</style>
+
+.image-modal {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(18, 24, 38, 0.98));
+  border-radius: 24px;
+  padding: 0;
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 100%;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+.modal-header .modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #F8FAFC;
+}
+
+.close-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: #94A3B8;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.close-icon:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+}
+
+.image-container {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 50vh;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.download-btn {
+  width: calc(100% - 40px);
+  margin: 0 20px 20px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}</style>

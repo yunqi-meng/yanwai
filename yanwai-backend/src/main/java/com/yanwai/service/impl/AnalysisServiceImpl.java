@@ -74,6 +74,45 @@ public class AnalysisServiceImpl implements AnalysisService {
         return response;
     }
 
+    @Override
+    @Transactional
+    public DecodeResponse decodeWithImage(Long userId, String base64Image, String dialogText) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        AnalysisResultDTO analysisResult = aiService.analyzeWithImage(base64Image, dialogText);
+
+        String originalText = dialogText != null ? dialogText : "[来自图片的分析]";
+
+        AnalysisRecord record = new AnalysisRecord();
+        record.setUserId(userId);
+        record.setOriginalText(originalText);
+        record.setRelationship(analysisResult.getRelationship());
+        record.setAnalysisResult(JSON.toJSONString(analysisResult));
+        record.setEmotionCurve(JSON.toJSONString(analysisResult.getEmotionCurve()));
+        record.setTranslations(JSON.toJSONString(analysisResult.getTranslations()));
+        record.setAdvice(JSON.toJSONString(analysisResult.getAdvice()));
+        record.setOriginalImage(base64Image);
+        analysisRecordMapper.insert(record);
+
+        updateUserStats(user, originalText);
+
+        CardDropResultDTO cardDrop = gameService.dropCard(userId, user.getMemberLevel());
+
+        User updatedUser = userMapper.selectById(userId);
+        List<AchievementDTO> newAchievements = gameService.checkAndUnlock(userId, updatedUser);
+
+        DecodeResponse response = new DecodeResponse();
+        response.setAnalysis(analysisResult);
+        response.setNewCard(cardDrop);
+        response.setNewAchievements(newAchievements);
+        response.setOriginalImage(base64Image);
+
+        return response;
+    }
+
     private void updateUserStats(User user, String text) {
         LocalTime now = LocalTime.now();
         if (now.isAfter(LocalTime.of(22, 0)) || now.isBefore(LocalTime.of(6, 0))) {

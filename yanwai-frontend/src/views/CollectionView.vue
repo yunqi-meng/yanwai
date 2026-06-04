@@ -153,6 +153,7 @@ const unlockedAchievementCodes = ref([])
 
 const rarityFilters = [
   { label: '全部', value: 'all' },
+  { label: '已拥有', value: 'owned' },
   { label: '普通', value: 1 },
   { label: '稀有', value: 2 },
   { label: '史诗', value: 3 },
@@ -180,6 +181,11 @@ const filteredCards = computed(() => {
   if (currentFilter.value === 'all') {
     return cardsWithOwned
   }
+  
+  if (currentFilter.value === 'owned') {
+    return cardsWithOwned.filter(c => c.owned)
+  }
+  
   return cardsWithOwned.filter(c => c.rarity === currentFilter.value)
 })
 
@@ -234,7 +240,7 @@ onMounted(() => {
 <style scoped>
 .collection-container {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0B0E14 0%, #0A0D12 100%);
+  background: var(--bg-page);
   padding: 20px;
 }
 
@@ -267,7 +273,7 @@ onMounted(() => {
   padding: 12px 32px;
   border: none;
   background: transparent;
-  color: #94A3B8;
+  color: var(--text-secondary);
   font-size: 15px;
   font-weight: 600;
   border-radius: 12px;
@@ -287,7 +293,7 @@ onMounted(() => {
 }
 
 .stats-card, .achievement-stats {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(18, 24, 38, 0.8));
+  background: var(--bg-card);
   border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 20px;
   padding: 24px;
@@ -307,7 +313,7 @@ onMounted(() => {
 
 .stat-label {
   flex: 1;
-  color: #94A3B8;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -319,7 +325,7 @@ onMounted(() => {
 
 .progress-bar {
   height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -363,8 +369,8 @@ onMounted(() => {
 .filter-btn {
   padding: 8px 16px;
   border: 1px solid rgba(212, 175, 55, 0.3);
-  background: rgba(30, 41, 59, 0.4);
-  color: #94A3B8;
+  background: var(--bg-input);
+  color: var(--text-secondary);
   font-size: 13px;
   border-radius: 12px;
   cursor: pointer;
@@ -384,7 +390,7 @@ onMounted(() => {
 }
 
 .card-item {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(18, 24, 38, 0.8));
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 16px;
   text-align: center;

@@ -1,9 +1,10 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+
+const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
 const api = axios.create({
-  baseURL: '',
-  timeout: 60000,
+  baseURL: baseURL,
+  timeout: 180000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -26,13 +27,11 @@ api.interceptors.response.use(
   response => {
     const res = response.data
     if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
       return Promise.reject(new Error(res.message || '请求失败'))
     }
     return response
   },
   error => {
-    ElMessage.error(error.message || '网络请求失败')
     return Promise.reject(error)
   }
 )
@@ -46,6 +45,10 @@ export default {
 
 export const analysisApi = {
   decode: (text) => api.post('/api/analysis/decode', { text }),
+  analyzeImage: (formData) => api.post('/api/analysis/analyze-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000
+  }),
   uploadImage: (formData) => api.post('/api/analysis/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -57,8 +60,7 @@ export const analysisApi = {
 
 export const cardsApi = {
   getDefinitions: () => api.get('/api/cards/definitions'),
-  getUserCards: () => api.get('/api/cards/user'),
-  synthesize: (cardId) => api.post('/api/cards/synthesize', { cardId })
+  getUserCards: () => api.get('/api/cards/user')
 }
 
 export const achievementsApi = {
@@ -67,8 +69,13 @@ export const achievementsApi = {
 }
 
 export const userApi = {
-  login: (openid) => api.post('/api/user/login', { openid }),
+  login: (email, password) => api.post('/api/user/login', { email, password }),
+  register: (email, password) => api.post('/api/user/register', { email, password }),
+  guestLogin: (deviceId) => api.post('/api/user/guest-login', { deviceId }),
   getStats: () => api.get('/api/user/stats'),
   reset: () => api.post('/api/user/reset'),
-  buyVip: () => api.post('/api/user/buy-vip')
+  buyVip: () => api.post('/api/user/buy-vip'),
+  watchAdComplete: () => api.post('/api/user/watch-ad-complete'),
+  canWatchAd: () => api.get('/api/user/can-watch-ad'),
+  updateInfo: (nickname, avatar) => api.post('/api/user/update-info', { nickname, avatar })
 }

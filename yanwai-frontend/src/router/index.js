@@ -3,6 +3,8 @@ import HomeView from '../views/HomeView.vue'
 import ResultView from '../views/ResultView.vue'
 import CollectionView from '../views/CollectionView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import HistoryView from '../views/HistoryView.vue'
+import AuthView from '../views/AuthView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes = [
@@ -10,6 +12,15 @@ const routes = [
     path: '/',
     name: 'home',
     component: HomeView
+  },
+  {
+    path: '/auth',
+    name: 'auth',
+    component: AuthView
+  },
+  {
+    path: '/home',
+    redirect: '/'
   },
   {
     path: '/result',
@@ -27,6 +38,11 @@ const routes = [
     component: ProfileView
   },
   {
+    path: '/history',
+    name: 'history',
+    component: HistoryView
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: NotFoundView
@@ -36,6 +52,15 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to, from, next) => {
+  const isLoggedIn = localStorage.getItem('userId')
+  if (!isLoggedIn && to.name !== 'auth') {
+    next('/auth')
+  } else {
+    next()
+  }
 })
 
 export default router

@@ -9,6 +9,7 @@ import com.yanwai.dto.UserCardDTO;
 import com.yanwai.entity.*;
 import com.yanwai.mapper.*;
 import com.yanwai.service.GameService;
+import com.yanwai.service.UserService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,23 +25,23 @@ public class GameServiceImpl implements GameService {
 
     private final PersonalityCardDefMapper cardDefMapper;
     private final UserCardMapper userCardMapper;
-    private final UserCardFragmentMapper fragmentMapper;
     private final AchievementDefMapper achievementDefMapper;
     private final UserAchievementMapper userAchievementMapper;
+    private final UserMapper userMapper;
     private final Double cardDropProbability;
 
     public GameServiceImpl(
             PersonalityCardDefMapper cardDefMapper,
             UserCardMapper userCardMapper,
-            UserCardFragmentMapper fragmentMapper,
             AchievementDefMapper achievementDefMapper,
             UserAchievementMapper userAchievementMapper,
+            UserMapper userMapper,
             @Value("${yanwai.game.card-drop-probability:0.3}") Double cardDropProbability) {
         this.cardDefMapper = cardDefMapper;
         this.userCardMapper = userCardMapper;
-        this.fragmentMapper = fragmentMapper;
         this.achievementDefMapper = achievementDefMapper;
         this.userAchievementMapper = userAchievementMapper;
+        this.userMapper = userMapper;
         this.cardDropProbability = cardDropProbability;
     }
 
@@ -94,8 +95,6 @@ public class GameServiceImpl implements GameService {
         result.setRarity(cardDef.getRarity());
         result.setEmoji(cardDef.getEmoji());
         result.setDescription(cardDef.getDescription());
-        result.setFragmentAdded(0);
-        result.setSynthesized(false);
 
         if (userCard == null) {
             UserCard newCard = new UserCard();
@@ -105,78 +104,22 @@ public class GameServiceImpl implements GameService {
             newCard.setIsNew(1);
             userCardMapper.insert(newCard);
             result.setIsNew(true);
-        } else {
-            int oldQuantity = userCard.getQuantity();
-            int newQuantity = oldQuantity + 1;
-            userCard.setQuantity(newQuantity);
-            userCard.setIsNew(1);
-            userCardMapper.updateById(userCard);
-
-            if (newQuantity > 1) {
-                int fragments = newQuantity - 1;
-                addFragment(userId, cardDef.getId(), fragments);
-                result.setFragmentAdded(fragments);
+            
+            if (cardDef.getRarity() != null && cardDef.getRarity() >= GameConstants.RARITY_LEGEND) {
+                User user = userMapper.selectById(userId);
+                if (user != null) {
+                    user.setLegendCount(user.getLegendCount() != null ? user.getLegendCount() + 1 : 1);
+                    userMapper.updateById(user);
+                }
             }
-            result.setIsNew(false);
-        }
-
-        return result;
-    }
-
-    private void addFragment(Long userId, Long cardId, int count) {
-        LambdaQueryWrapper<UserCardFragment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserCardFragment::getUserId, userId)
-               .eq(UserCardFragment::getCardId, cardId);
-        UserCardFragment fragment = fragmentMapper.selectOne(wrapper);
-
-        if (fragment == null) {
-            fragment = new UserCardFragment();
-            fragment.setUserId(userId);
-            fragment.setCardId(cardId);
-            fragment.setFragmentCount(count);
-            fragmentMapper.insert(fragment);
-        } else {
-            fragment.setFragmentCount(fragment.getFragmentCount() + count);
-            fragmentMapper.updateById(fragment);
-        }
-    }
-
-    @Override
-    @Transactional
-    public void synthesizeCard(Long userId, Long cardId) {
-        LambdaQueryWrapper<UserCardFragment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserCardFragment::getUserId, userId)
-               .eq(UserCardFragment::getCardId, cardId);
-        UserCardFragment fragment = fragmentMapper.selectOne(wrapper);
-
-        if (fragment == null || fragment.getFragmentCount() < GameConstants.FRAGMENT_COUNT_FOR_SYNTHESIS) {
-            throw new RuntimeException("碎片数量不足");
-        }
-
-        fragment.setFragmentCount(fragment.getFragmentCount() - GameConstants.FRAGMENT_COUNT_FOR_SYNTHESIS);
-        if (fragment.getFragmentCount() == 0) {
-            fragmentMapper.deleteById(fragment);
-        } else {
-            fragmentMapper.updateById(fragment);
-        }
-
-        LambdaQueryWrapper<UserCard> cardWrapper = new LambdaQueryWrapper<>();
-        cardWrapper.eq(UserCard::getUserId, userId)
-                   .eq(UserCard::getCardId, cardId);
-        UserCard userCard = userCardMapper.selectOne(cardWrapper);
-
-        if (userCard == null) {
-            userCard = new UserCard();
-            userCard.setUserId(userId);
-            userCard.setCardId(cardId);
-            userCard.setQuantity(1);
-            userCard.setIsNew(1);
-            userCardMapper.insert(userCard);
         } else {
             userCard.setQuantity(userCard.getQuantity() + 1);
             userCard.setIsNew(1);
             userCardMapper.updateById(userCard);
+            result.setIsNew(false);
         }
+
+        return result;
     }
 
     @Override
@@ -192,18 +135,10 @@ public class GameServiceImpl implements GameService {
     @Override
     public List<UserCardDTO> getUserCards(Long userId) {
         List<PersonalityCardDef> allCards = cardDefMapper.selectList(null);
-        Map<Long, PersonalityCardDef> cardDefMap = allCards.stream()
-                .collect(Collectors.toMap(PersonalityCardDef::getId, c -> c));
 
         LambdaQueryWrapper<UserCard> cardWrapper = new LambdaQueryWrapper<>();
         cardWrapper.eq(UserCard::getUserId, userId);
         List<UserCard> userCards = userCardMapper.selectList(cardWrapper);
-
-        LambdaQueryWrapper<UserCardFragment> fragWrapper = new LambdaQueryWrapper<>();
-        fragWrapper.eq(UserCardFragment::getUserId, userId);
-        List<UserCardFragment> fragments = fragmentMapper.selectList(fragWrapper);
-        Map<Long, Integer> fragmentMap = fragments.stream()
-                .collect(Collectors.toMap(UserCardFragment::getCardId, UserCardFragment::getFragmentCount));
 
         Map<Long, UserCard> userCardMap = userCards.stream()
                 .collect(Collectors.toMap(UserCard::getCardId, c -> c));
@@ -226,7 +161,6 @@ public class GameServiceImpl implements GameService {
                 dto.setIsNew(false);
             }
 
-            dto.setFragmentCount(fragmentMap.getOrDefault(def.getId(), 0));
             result.add(dto);
         }
 
@@ -354,6 +288,10 @@ public class GameServiceImpl implements GameService {
                 return user.getWorkplaceCount() != null ? user.getWorkplaceCount() : 0;
             case "romance_count":
                 return user.getRomanceCount() != null ? user.getRomanceCount() : 0;
+            case "login_days":
+                return user.getLoginDays() != null ? user.getLoginDays() : 0;
+            case "legend_count":
+                return user.getLegendCount() != null ? user.getLegendCount() : 0;
             default:
                 return 0;
         }

@@ -18,7 +18,7 @@
             <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-        <div class="image-status" v-if="isOCRProcessing">
+        <div class="image-status" v-if="analysisStore.isImageAnalyzing">
           <div class="spinner"></div>
           <span>识别中...</span>
         </div>
@@ -30,6 +30,13 @@
         </div>
         <p class="upload-text">点击上传聊天截图</p>
         <p class="upload-hint">支持识别微信、QQ等聊天界面</p>
+      </div>
+
+      <div class="image-progress-wrapper" v-if="analysisStore.isAnalyzing && analysisStore.analysisType === 'image'">
+        <div class="image-progress-bar">
+          <div class="image-progress-fill" :style="{width: analysisStore.loadingProgress + '%'}"></div>
+        </div>
+        <span class="image-progress-text">正在分析图片... {{ Math.round(analysisStore.loadingProgress) }}%</span>
       </div>
     </div>
 
@@ -55,12 +62,10 @@ B: 随便"
     </div>
 
     <div class="count-wrapper">
-      <div class="remaining-count" v-if="userStore.memberLevel !== 1">
+      <div class="remaining-count" :class="{ vip: userStore.memberLevel === 1 }">
         <span class="count">{{ userStore.remainingAnalysis }}</span>
-        <span class="label">次今日免费解码</span>
-      </div>
-      <div class="remaining-count vip" v-else>
-        <span class="vip-badge">⭐ 会员无限解码</span>
+        <span class="label">/{{ dailyLimit }}次今日解码</span>
+        <span v-if="userStore.memberLevel === 1" class="vip-tag">⭐会员</span>
       </div>
     </div>
 
@@ -70,7 +75,7 @@ B: 随便"
       </div>
       <div class="history-list" v-if="!historyLoading && historyList.length > 0">
         <div
-          v-for="(item, index) in historyList.slice(0, 5)"
+          v-for="(item, index) in historyList.slice(0, 3)"
           :key="item.id"
           class="history-item"
         >
@@ -105,16 +110,16 @@ B: 随便"
 
     <button
       class="btn-gold decode-btn"
-      :disabled="(!dialogText.trim() && !isLoading) || !canDecode"
+      :disabled="(!dialogText.trim() && !analysisStore.isImageAnalyzing) || !canDecode || analysisStore.isAnalyzing"
       @click="startDecode"
     >
       <span class="btn-content">
-        <svg v-if="isLoading" class="btn-spinner" viewBox="0 0 24 24">
+        <svg v-if="analysisStore.isAnalyzing && !analysisStore.isImageAnalyzing" class="btn-spinner" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none"/>
           <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="4" fill="none"/>
         </svg>
         <span v-else>🔮</span>
-        <span>{{ isLoading ? '解码中...' : '开始解码' }}</span>
+        <span>{{ analysisStore.isAnalyzing ? '解码中...' : '开始解码' }}</span>
       </span>
     </button>
 
@@ -125,18 +130,6 @@ B: 随便"
       style="display: none"
       @change="handleFileSelect"
     />
-
-    <div class="loading-overlay" v-if="isLoading">
-      <div class="loading-animation">
-        <span class="icon">🔮</span>
-      </div>
-      <div class="loading-text">正在解读潜台词...</div>
-      <div class="loading-progress">
-        <div class="progress-bar">
-          <div class="progress-fill" :style="{width: loadingProgress + '%'}"></div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -144,27 +137,44 @@ B: 随便"
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { useAnalysisStore } from '../stores/analysis'
 import { analysisApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
+const analysisStore = useAnalysisStore()
 
 const dialogText = ref('')
-const isLoading = ref(false)
-const loadingProgress = ref(0)
 const historyList = ref([])
 const historyLoading = ref(false)
 const selectedImage = ref(null)
 const fileInput = ref(null)
-const isOCRProcessing = ref(false)
 
 const canDecode = computed(() => {
-  if (userStore.memberLevel === 1) return true
   return userStore.remainingAnalysis > 0
 })
 
+const dailyLimit = computed(() => {
+  return userStore.memberLevel === 1 ? 10 : 3
+})
+
+onMounted(() => {
+  if (analysisStore.result && !analysisStore.isAnalyzing) {
+    router.push({
+      path: '/result',
+      query: { timestamp: Date.now() }
+    })
+    return
+  }
+  if (analysisStore.originalImage && !analysisStore.isAnalyzing) {
+    selectedImage.value = analysisStore.originalImage
+  }
+  loadHistory()
+})
+
 function triggerUpload() {
+  if (analysisStore.isAnalyzing && analysisStore.analysisType === 'text') return
   fileInput.value?.click()
 }
 
@@ -193,35 +203,31 @@ async function handleFileSelect(event) {
 }
 
 async function processImage(file) {
-  isOCRProcessing.value = true
+  if (!canDecode.value) {
+    ElMessage.warning('今日免费解码次数已用完')
+    removeImage()
+    return
+  }
 
   try {
-    const formData = new FormData()
-    formData.append('image', file)
+    await analysisStore.startImageAnalysis(file)
 
-    const res = await analysisApi.uploadImage(formData)
+    userStore.incrementDailyCount()
 
-    if (res.data.code === 200) {
-      const extractedText = res.data.data.text
-      if (extractedText) {
-        dialogText.value = extractedText
-        ElMessage.success('图片解析成功！')
-      } else {
-        ElMessage.warning('未能识别到对话内容，请尝试直接输入文本')
-      }
-    } else {
-      ElMessage.error('图片解析失败，请重试')
-    }
+    router.push({
+      path: '/result',
+      query: { timestamp: Date.now() }
+    })
   } catch (e) {
-    console.error('Image upload failed:', e)
-    ElMessage.error('图片解析失败，请重试')
-  } finally {
-    isOCRProcessing.value = false
+    console.error('Image analyze failed:', e)
+    removeImage()
+    ElMessage.error(analysisStore.error || '图片分析失败，请重试')
   }
 }
 
 function removeImage() {
   selectedImage.value = null
+  analysisStore.originalImage = null
 }
 
 async function startDecode() {
@@ -230,36 +236,20 @@ async function startDecode() {
     return
   }
 
+  if (dialogText.value.length > 5000) {
+    ElMessage.warning('对话内容过长，请限制在5000字以内')
+    return
+  }
+
   if (!canDecode.value) {
     ElMessage.warning('今日免费解码次数已用完')
     return
   }
 
-  isLoading.value = true
-  loadingProgress.value = 0
-
-  const progressInterval = setInterval(() => {
-    loadingProgress.value += Math.random() * 15
-    if (loadingProgress.value > 90) loadingProgress.value = 90
-  }, 300)
-
   try {
-    const res = await analysisApi.decode(dialogText.value)
-    const result = res.data.data
+    await analysisStore.startTextAnalysis(dialogText.value)
 
-    loadingProgress.value = 100
     userStore.incrementDailyCount()
-
-    const decodeResult = {
-      text: dialogText.value,
-      analysis: result.analysis,
-      newCard: result.newCard,
-      newAchievements: result.newAchievements
-    }
-
-    sessionStorage.setItem('decodeResult', JSON.stringify(decodeResult))
-
-    await new Promise(resolve => setTimeout(resolve, 300))
 
     router.push({
       path: '/result',
@@ -267,25 +257,21 @@ async function startDecode() {
     })
   } catch (e) {
     console.error('Decode failed:', e)
-    ElMessage.error(e.message || '解码失败，请重试')
-  } finally {
-    clearInterval(progressInterval)
-    isLoading.value = false
-    loadingProgress.value = 0
+    ElMessage.error(analysisStore.error || '解码失败，请重试')
   }
 }
 
 async function loadHistoryDetail(item) {
   if (item.analysisResult) {
     try {
-      const analysis = JSON.parse(item.analysisResult)
-      const decodeResult = {
-        text: item.originalText,
-        analysis,
-        newCard: null,
-        newAchievements: []
-      }
-      sessionStorage.setItem('decodeResult', JSON.stringify(decodeResult))
+      const detailRes = await analysisApi.getHistoryDetail(item.id)
+      const detail = detailRes.data.data
+      const analysis = JSON.parse(detail.analysisResult)
+      analysisStore.result = analysis
+      analysisStore.newCard = null
+      analysisStore.newAchievements = []
+      analysisStore.originalImage = detail.originalImage || null
+      analysisStore.analysisText = detail.originalText || ''
       router.push({
         path: '/result',
         query: { timestamp: Date.now() }
@@ -338,11 +324,6 @@ function formatTime(time) {
   if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
   return date.toLocaleDateString('zh-CN')
 }
-
-onMounted(() => {
-  userStore.fetchStats()
-  loadHistory()
-})
 </script>
 
 <style scoped>
@@ -393,7 +374,7 @@ onMounted(() => {
 }
 
 .subtitle {
-  color: #94A3B8;
+  color: var(--text-secondary);
   font-size: 15px;
   font-weight: 500;
   letter-spacing: 1px;
@@ -469,20 +450,20 @@ onMounted(() => {
 }
 
 .upload-text {
-  color: #F8FAFC;
+  color: var(--text-primary);
   font-size: 17px;
   font-weight: 600;
   margin: 0 0 6px;
 }
 
 .upload-hint {
-  color: #64748B;
+  color: var(--text-tertiary);
   font-size: 13px;
   margin: 0;
 }
 
 .image-preview-wrapper {
-  background: rgba(30, 41, 59, 0.8);
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 16px;
   margin-bottom: 16px;
@@ -562,26 +543,12 @@ onMounted(() => {
 
 .divider-text {
   padding: 0 16px;
-  color: #64748B;
+  color: var(--text-tertiary);
   font-size: 13px;
 }
 
 .text-input-wrapper {
   margin-bottom: 12px;
-}
-
-.dialog-input :deep(.el-textarea__inner) {
-  background: #1E293B !important;
-  border: 1px solid rgba(212, 175, 55, 0.2) !important;
-  border-radius: 16px !important;
-  color: #F8FAFC;
-  font-size: 15px;
-  line-height: 1.7;
-  padding: 18px 16px;
-}
-
-.dialog-input :deep(.el-textarea__inner::placeholder) {
-  color: #64748B !important;
 }
 
 .count-wrapper {
@@ -593,7 +560,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: #94A3B8;
+  color: var(--text-secondary);
 }
 
 .remaining-count .count {
@@ -612,6 +579,12 @@ onMounted(() => {
   font-size: 15px;
 }
 
+.vip-tag {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #D4AF37;
+}
+
 .history-section {
   margin-bottom: 20px;
 }
@@ -625,7 +598,7 @@ onMounted(() => {
 
 .section-title {
   font-size: 14px;
-  color: #94A3B8;
+  color: var(--text-secondary);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -637,7 +610,7 @@ onMounted(() => {
 }
 
 .history-item {
-  background: linear-gradient(145deg, rgba(18, 24, 38, 0.95), rgba(18, 24, 38, 0.9));
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 14px;
   display: flex;
@@ -650,7 +623,7 @@ onMounted(() => {
 .history-item:hover {
   border-color: rgba(212, 175, 55, 0.25);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-soft);
 }
 
 .history-content-wrapper {
@@ -659,7 +632,7 @@ onMounted(() => {
 }
 
 .history-content {
-  color: #F8FAFC;
+  color: var(--text-primary);
   font-size: 14px;
   margin-bottom: 8px;
   overflow: hidden;
@@ -685,7 +658,7 @@ onMounted(() => {
 }
 
 .history-time {
-  color: #64748B;
+  color: var(--text-tertiary);
   font-size: 12px;
   flex-shrink: 0;
 }
@@ -711,11 +684,11 @@ onMounted(() => {
 }
 
 .empty-history {
-  color: #94A3B8;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
   padding: 36px 20px;
-  background: rgba(30, 41, 59, 0.4);
+  background: var(--bg-input);
   border-radius: 16px;
   border: 1px dashed rgba(212, 175, 55, 0.1);
   display: flex;
@@ -814,6 +787,10 @@ onMounted(() => {
   backdrop-filter: blur(10px);
 }
 
+body.theme-light .loading-overlay {
+  background: rgba(248, 250, 252, 0.95);
+}
+
 .loading-animation {
   position: relative;
 }
@@ -845,7 +822,7 @@ onMounted(() => {
 
 .loading-progress .progress-bar {
   height: 6px;
-  background: #1E293B;
+  background: var(--bg-input);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -855,5 +832,35 @@ onMounted(() => {
   background: linear-gradient(90deg, #B8860B, #D4AF37, #F5D061);
   transition: width 0.3s ease;
   border-radius: 3px;
+}
+
+.image-progress-wrapper {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(212, 175, 55, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.image-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #B8860B, #D4AF37, #F5D061);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+}
+
+.image-progress-text {
+  color: #D4AF37;
+  font-size: 13px;
+  font-weight: 500;
 }
 </style>

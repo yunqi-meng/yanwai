@@ -13,6 +13,10 @@ public class User {
     
     private String openid;
     
+    private String email;
+    
+    private String password;
+    
     private String nickname;
     
     @TableField("member_level")
@@ -44,6 +48,15 @@ public class User {
     
     @TableField("last_ad_watch_date")
     private LocalDate lastAdWatchDate;
+    
+    @TableField("login_days")
+    private Integer loginDays;
+    
+    @TableField("legend_count")
+    private Integer legendCount;
+    
+    @TableField("last_login_date")
+    private LocalDate lastLoginDate;
     
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

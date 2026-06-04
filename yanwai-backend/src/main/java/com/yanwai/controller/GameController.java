@@ -8,7 +8,6 @@ import com.yanwai.service.GameService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -44,19 +43,4 @@ public class GameController {
         return Result.success(cards);
     }
 
-    @PostMapping("/cards/synthesize")
-    public Result<String> synthesizeCard(
-            @RequestHeader("X-User-Id") Long userId,
-            @RequestBody Map<String, Long> request) {
-        Long cardId = request.get("cardId");
-        if (cardId == null) {
-            return Result.fail("cardId不能为空");
-        }
-        try {
-            gameService.synthesizeCard(userId, cardId);
-            return Result.success("合成成功");
-        } catch (Exception e) {
-            return Result.fail(e.getMessage());
-        }
-    }
 }

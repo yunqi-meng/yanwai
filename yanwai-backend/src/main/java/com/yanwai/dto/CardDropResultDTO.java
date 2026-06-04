@@ -10,6 +10,4 @@ public class CardDropResultDTO {
     private String emoji;
     private String description;
     private Boolean isNew;
-    private Integer fragmentAdded;
-    private Boolean synthesized;
 }

@@ -6,12 +6,9 @@ spring:
     name: yanwai-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/yanwai?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: lyp1234zhen
-  sql:
-    init:
-      mode: never
+    url: ${DB_URL:jdbc:mysql://localhost:3306/yanwai?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:lyp1234zhen}
 
 mybatis-plus:
   configuration:
@@ -27,13 +24,16 @@ mybatis-plus:
 
 yanwai:
   ai:
-    api-key: sk-34b9188719fb4189a77665b68f8e4d62
-    base-url: https://api.deepseek.com
-    model: deepseek-chat
+    api-key: ${YANWAI_AI_API_KEY:}
+    base-url: ${YANWAI_AI_BASE_URL:https://api.deepseek.com}
+    model: ${YANWAI_AI_MODEL:deepseek-v4-flash}
+    vision-base-url: ${YANWAI_AI_VISION_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
+    vision-api-key: ${YANWAI_AI_VISION_API_KEY:}
+    vision-model: ${YANWAI_AI_VISION_MODEL:doubao-seed-2-0-lite-260428}
+    vision-url: ${yanwai.ai.vision-base-url}/responses
     max-tokens: 2000
     temperature: 0.7
     enable-mock: false
   game:
     card-drop-probability: 0.3
-    fragment-count-for-synthesis: 5
     free-daily-analysis: 3

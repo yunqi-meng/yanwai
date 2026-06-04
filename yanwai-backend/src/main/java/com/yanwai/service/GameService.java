@@ -9,16 +9,14 @@ import java.util.List;
 
 public interface GameService {
     CardDropResultDTO dropCard(Long userId, Integer memberLevel);
-    
+
     List<AchievementDTO> checkAndUnlock(Long userId, User userStat);
-    
-    void synthesizeCard(Long userId, Long cardId);
-    
+
     List<PersonalityCardDTO> getAllCardDefinitions();
-    
+
     List<UserCardDTO> getUserCards(Long userId);
-    
+
     List<AchievementDTO> getAllAchievements(Long userId);
-    
+
     List<AchievementDTO> getUserAchievements(Long userId);
 }

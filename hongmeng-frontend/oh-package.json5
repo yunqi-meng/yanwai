@@ -1,0 +1,13 @@
+{
+  "modelVersion": "6.1.0",
+  "name": "hongmeng-frontend",
+  "version": "1.0.0",
+  "description": "言外鸿蒙前端",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.17"
+  }
+}

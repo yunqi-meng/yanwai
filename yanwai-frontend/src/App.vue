@@ -19,20 +19,34 @@
         <span class="label">{{ tab.label }}</span>
       </div>
     </nav>
+
+    <div class="loading-overlay" v-if="analysisStore.isAnalyzing && analysisStore.analysisType === 'text'">
+      <div class="loading-animation">
+        <span class="icon">🔮</span>
+      </div>
+      <div class="loading-text">正在解读潜台词...</div>
+      <div class="loading-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{width: analysisStore.loadingProgress + '%'}"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from './stores/user'
+import { useAnalysisStore } from './stores/analysis'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const analysisStore = useAnalysisStore()
 
 const tabs = [
-  { path: '/', label: '解码', icon: '🔮' },
+  { path: '/home', label: '解码', icon: '🔮' },
   { path: '/collection', label: '收藏', icon: '📚' },
   { path: '/profile', label: '我的', icon: '👤' }
 ]
@@ -40,20 +54,33 @@ const tabs = [
 const currentPath = computed(() => route.path)
 
 function goTo(path) {
+  if (analysisStore.isAnalyzing && analysisStore.analysisType === 'text') return
   router.push(path)
 }
 
+watch(() => analysisStore.isAnalyzing, (analyzing) => {
+  if (!analyzing && analysisStore.result && route.path === '/home') {
+    router.push({
+      path: '/result',
+      query: { timestamp: Date.now() }
+    })
+  }
+})
+
 onMounted(async () => {
-  await userStore.login()
+  if (userStore.userId) {
+    await userStore.fetchStats()
+  }
 })
 </script>
 
 <style scoped>
 .app-container {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0B0E14 0%, #0A0D12 100%);
+  background: var(--bg-page);
   position: relative;
   overflow-x: hidden;
+  transition: background 0.3s ease;
 }
 
 .app-container::before {
@@ -89,85 +116,72 @@ onMounted(async () => {
   transform: translateX(-20px);
 }
 
-.tab-bar {
+.loading-overlay {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 430px;
-  height: 70px;
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98) 0%, rgba(18, 24, 38, 0.98) 100%);
-  border-top: 1px solid rgba(212, 175, 55, 0.2);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 100;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
-}
-
-.tab-item {
+  background: rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: #94A3B8;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 10px 20px;
-  border-radius: 14px;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(10px);
+}
+
+body.theme-light .loading-overlay {
+  background: rgba(248, 250, 252, 0.95);
+}
+
+.loading-animation {
   position: relative;
 }
 
-.tab-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #B8860B, #D4AF37, #F5D061);
-  border-radius: 0 0 3px 3px;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.loading-animation .icon {
+  font-size: 90px;
+  animation: float 2s ease-in-out infinite;
+  display: block;
 }
 
-.tab-item:hover {
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(5deg); }
+}
+
+.loading-text {
   color: #D4AF37;
-  background: rgba(212, 175, 55, 0.05);
-}
-
-.tab-item.active {
-  color: #D4AF37;
-}
-
-.tab-item.active::before {
-  width: 30px;
-}
-
-.tab-item .icon {
-  font-size: 26px;
-  margin-bottom: 4px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.tab-item:hover .icon {
-  transform: translateY(-2px) scale(1.1);
-}
-
-.tab-item.active .icon {
-  transform: translateY(-3px) scale(1.15);
-  filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.5));
-}
-
-.tab-item .label {
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.tab-item.active .label {
+  font-size: 20px;
   font-weight: 700;
+  margin-top: 24px;
+  letter-spacing: 1px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.loading-progress {
+  width: 200px;
+  margin-top: 24px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(212, 175, 55, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #B8860B, #D4AF37, #F5D061);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
 }
 </style>

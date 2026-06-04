@@ -18,6 +18,9 @@ CREATE TABLE user (
     late_night_count INT DEFAULT 0 COMMENT '深夜分析次数',
     workplace_count INT DEFAULT 0 COMMENT '职场类分析次数',
     romance_count INT DEFAULT 0 COMMENT '情感类分析次数',
+    login_days INT DEFAULT 0 COMMENT '连续登录天数',
+    legend_count INT DEFAULT 0 COMMENT '传说卡牌拥有数量',
+    last_login_date DATE DEFAULT NULL COMMENT '上次登录日期',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
@@ -36,6 +39,7 @@ CREATE TABLE analysis_record (
     emotion_curve JSON COMMENT '情绪曲线数据',
     translations JSON COMMENT '逐句翻译数组',
     advice JSON COMMENT '建议数组',
+    original_image LONGTEXT COMMENT '原始图片base64',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
     INDEX idx_user_id (user_id),
@@ -101,20 +105,6 @@ CREATE TABLE user_card (
     UNIQUE KEY uk_user_card (user_id, card_id),
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户卡牌表';
-
--- 碎片表
-DROP TABLE IF EXISTS user_card_fragment;
-CREATE TABLE user_card_fragment (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-    user_id BIGINT NOT NULL COMMENT '用户ID',
-    card_id BIGINT NOT NULL COMMENT '卡牌ID',
-    fragment_count INT DEFAULT 0 COMMENT '碎片数量',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
-    UNIQUE KEY uk_user_fragment (user_id, card_id),
-    INDEX idx_user_id (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户卡牌碎片表';
 
 -- 初始化成就数据
 INSERT INTO achievement_def (code, name, description, condition_field, condition_op, condition_value, reward_type, reward_value, icon) VALUES
@@ -221,3 +211,60 @@ INSERT INTO personality_card_def (name, rarity, emoji, description, personality_
 ('读心大师', 4, '👁️‍🗨️', '能读懂他人的每一个想法', '读心型', '读心宗师'),
 ('完美社交家', 4, '💎', '社交表现无懈可击', '完美型', '完美社交'),
 ('命运编织者', 4, '🕸️', '能影响他人的命运走向', '编织型', '命运编织');
+
+-- 管理员表
+DROP TABLE IF EXISTS admin;
+CREATE TABLE admin (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+    password VARCHAR(100) NOT NULL COMMENT '密码(MD5加密)',
+    real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
+    role TINYINT DEFAULT 1 COMMENT '角色: 1管理员 2超级管理员',
+    status TINYINT DEFAULT 1 COMMENT '状态: 1正常 0禁用',
+    last_login_time DATETIME DEFAULT NULL COMMENT '最后登录时间',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
+    INDEX idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员表';
+
+-- 初始化管理员数据（密码: 123456）
+INSERT INTO admin (username, password, real_name, role) VALUES ('admin', 'e10adc3949ba59abbe56e057f20f883e', '超级管理员', 2);
+
+-- 系统配置表
+DROP TABLE IF EXISTS system_config;
+CREATE TABLE system_config (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    config_key VARCHAR(100) NOT NULL UNIQUE COMMENT '配置键',
+    config_value TEXT COMMENT '配置值',
+    description VARCHAR(255) DEFAULT NULL COMMENT '配置描述',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_config_key (config_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+
+-- 操作日志表
+DROP TABLE IF EXISTS operation_log;
+CREATE TABLE operation_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    admin_id BIGINT NOT NULL COMMENT '管理员ID',
+    operation VARCHAR(100) NOT NULL COMMENT '操作描述',
+    method VARCHAR(10) DEFAULT NULL COMMENT '请求方法',
+    params TEXT COMMENT '请求参数',
+    ip VARCHAR(50) DEFAULT NULL COMMENT 'IP地址',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_admin_id (admin_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
+
+-- 用户卡牌碎片表
+DROP TABLE IF EXISTS user_card_fragment;
+CREATE TABLE user_card_fragment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    card_id BIGINT NOT NULL COMMENT '卡牌ID',
+    fragment_count INT DEFAULT 0 COMMENT '碎片数量',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户卡牌碎片表';

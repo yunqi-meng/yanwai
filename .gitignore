@@ -34,7 +34,12 @@ pnpm-debug.log*
 # Build
 yanwai-frontend/dist/
 yanwai-frontend/.vite/
+yanwai-admin/dist/
+yanwai-admin/.vite/
+hongmeng-frontend/.hvigor/
+hongmeng-frontend/oh_modules/
 *.local
+*.mjs
 
 # Logs
 *.log

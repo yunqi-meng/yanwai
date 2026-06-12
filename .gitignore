@@ -51,6 +51,13 @@ android/capacitor-android/
 ios/App/Pods/
 ios/App/build/
 
+# Android SDK
+yanwai-frontend/android-sdk/
+yanwai-frontend/android/
+
+# Appanalyzer
+hongmeng-frontend/.appanalyzer/
+
 # Vite temporary files
 *.timestamp-*.mjs
 

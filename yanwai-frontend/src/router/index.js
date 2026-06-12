@@ -6,6 +6,9 @@ import ProfileView from '../views/ProfileView.vue'
 import HistoryView from '../views/HistoryView.vue'
 import AuthView from '../views/AuthView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import CheckinView from '../views/CheckinView.vue'
+import FriendsView from '../views/FriendsView.vue'
+import RankingView from '../views/RankingView.vue'
 
 const routes = [
   {
@@ -41,6 +44,21 @@ const routes = [
     path: '/history',
     name: 'history',
     component: HistoryView
+  },
+  {
+    path: '/checkin',
+    name: 'checkin',
+    component: CheckinView
+  },
+  {
+    path: '/friends',
+    name: 'friends',
+    component: FriendsView
+  },
+  {
+    path: '/ranking',
+    name: 'ranking',
+    component: RankingView
   },
   {
     path: '/:pathMatch(.*)*',

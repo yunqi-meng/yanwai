@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yanwai.dto.Result;
 import com.yanwai.entity.*;
 import com.yanwai.service.AdminService;
+import com.yanwai.util.JwtUtil;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,9 +15,11 @@ import java.util.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final JwtUtil jwtUtil;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, JwtUtil jwtUtil) {
         this.adminService = adminService;
+        this.jwtUtil = jwtUtil;
     }
 
     // ==================== 管员认证 ====================
@@ -38,8 +41,10 @@ public class AdminController {
             return Result.fail("用户名或密码错误");
         }
         
+        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), admin.getRole());
+        
         Map<String, Object> data = new HashMap<>();
-        data.put("token", UUID.randomUUID().toString().replace("-", ""));
+        data.put("token", token);
         data.put("adminId", admin.getId());
         data.put("username", admin.getUsername());
         data.put("realName", admin.getRealName());

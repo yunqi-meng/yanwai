@@ -1,0 +1,160 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # 后端构建和测试
+  backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testroot
+          MYSQL_DATABASE: yanwai_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 22
+      uses: actions/setup-java@v4
+      with:
+        java-version: '22'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Build with Maven
+      working-directory: yanwai-backend
+      run: mvn clean compile
+    
+    - name: Run tests
+      working-directory: yanwai-backend
+      env:
+        DB_URL: jdbc:mysql://localhost:3306/yanwai_test?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+        DB_USERNAME: root
+        DB_PASSWORD: testroot
+        YANWAI_AI_ENABLE_MOCK: true
+      run: mvn test
+    
+    - name: Package
+      working-directory: yanwai-backend
+      run: mvn package -DskipTests
+    
+    - name: Upload backend artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-jar
+        path: yanwai-backend/target/*.jar
+
+  # Web前端构建
+  frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: yanwai-frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: yanwai-frontend
+      run: npm ci
+    
+    - name: Build
+      working-directory: yanwai-frontend
+      run: npm run build
+    
+    - name: Upload frontend artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-dist
+        path: yanwai-frontend/dist
+
+  # 管理后台构建
+  admin:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: yanwai-admin/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: yanwai-admin
+      run: npm ci
+    
+    - name: Build
+      working-directory: yanwai-admin
+      run: npm run build
+    
+    - name: Upload admin artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-dist
+        path: yanwai-admin/dist
+
+  # Docker构建（仅在main分支推送时）
+  docker:
+    needs: [backend, frontend, admin]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push Backend
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.backend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/yanwai-backend:latest
+    
+    - name: Build and push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.frontend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/yanwai-frontend:latest
+    
+    - name: Build and push Admin
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.admin
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/yanwai-admin:latest

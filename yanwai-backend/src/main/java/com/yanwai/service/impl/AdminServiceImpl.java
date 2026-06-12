@@ -9,7 +9,7 @@ import com.yanwai.mapper.*;
 import com.yanwai.service.AdminService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.DigestUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,12 +28,14 @@ public class AdminServiceImpl implements AdminService {
     private final OperationLogMapper logMapper;
     private final AiProperties aiProperties;
     private final GameProperties gameProperties;
+    private final PasswordEncoder passwordEncoder;
 
     public AdminServiceImpl(AdminMapper adminMapper, UserMapper userMapper,
                            PersonalityCardDefMapper cardMapper, AchievementDefMapper achievementMapper,
                            AnalysisRecordMapper analysisMapper, SystemConfigMapper configMapper,
                            OperationLogMapper logMapper,
-                           AiProperties aiProperties, GameProperties gameProperties) {
+                           AiProperties aiProperties, GameProperties gameProperties,
+                           PasswordEncoder passwordEncoder) {
         this.adminMapper = adminMapper;
         this.userMapper = userMapper;
         this.cardMapper = cardMapper;
@@ -43,6 +45,7 @@ public class AdminServiceImpl implements AdminService {
         this.logMapper = logMapper;
         this.aiProperties = aiProperties;
         this.gameProperties = gameProperties;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -412,7 +415,6 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private boolean verifyPassword(String rawPassword, String encryptedPassword) {
-        String encrypted = DigestUtils.md5DigestAsHex(rawPassword.getBytes());
-        return encrypted.equals(encryptedPassword);
+        return passwordEncoder.matches(rawPassword, encryptedPassword);
     }
 }
